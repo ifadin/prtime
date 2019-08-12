@@ -6,7 +6,7 @@ import click
 import yaml
 from github import Github
 
-from cli.distribution import analyze_repos
+from cli.distribution import get_time_analysis
 from cli.options import NotRequiredIfOpt
 
 BASE_URL = 'https://api.github.com'
@@ -48,10 +48,11 @@ def cli(login: str,
                 abort('Please supply repository names in author/repo format or specify organization with -o flag')
 
     gh_client = get_github_client(gh_url, login, password, auth_token)
-    time_filter = f'(last {days} days)' if days else ''
-    click.echo(f'Calculating for {gh_repos} {time_filter}')
+    time_filter = f' (last {days} days)' if days else ''
+    click.echo(f'Calculating for {highlight(gh_repos)}{time_filter}:')
 
-    analyze_repos(gh_client, gh_repos, days, verbose)
+    df = get_time_analysis(gh_client, gh_repos, days, verbose)
+    click.echo(df)
 
 
 def get_config_params(config_file: str, base_url: str, organization: str, repos: List[str]):
@@ -80,6 +81,10 @@ def get_github_client(base_url: str, login: str, password: str, token: str):
 
 def abort(msg: str):
     raise click.ClickException(msg)
+
+
+def highlight(text: str):
+    return click.style(f'{text}', fg='green')
 
 
 if __name__ == '__main__':
