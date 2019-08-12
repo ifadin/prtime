@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-
+import json
 from typing import List
 
 import click
+import yaml
 from github import Github
 
 from cli.distribution import analyze_repos
-from cli.notrequiredif import NotRequiredIfOpt
+from cli.options import NotRequiredIfOpt
 
 BASE_URL = 'https://api.github.com'
-# BASE_URL = 'https://github.bus.zalan.do/api/v3'
 REPOS = ['deploy', 'integrator', 'ci-gooddata-sql', 'gooddata-python', 'dna-tools', 'ci-master-workspace', 'airpipe']
 
 
@@ -20,6 +20,7 @@ REPOS = ['deploy', 'integrator', 'ci-gooddata-sql', 'gooddata-python', 'dna-tool
               cls=NotRequiredIfOpt, not_required_if='auth_token')
 @click.option('-t', '--auth-token', type=click.STRING, help='Github authentication token', required=True,
               cls=NotRequiredIfOpt, not_required_if=['login', 'password'])
+@click.option('-c', '--config-file', type=click.Path(exists=True), help='Path to config file (JSON or YAML)')
 @click.option('-u', '--base-url', type=click.STRING, help='Github API endpoint URL')
 @click.option('-o', '--organization', type=click.STRING, help='Github organization to search repositories in')
 @click.option('-d', '--days', type=click.INT, help='Limit analysis to last n days')
@@ -28,22 +29,40 @@ REPOS = ['deploy', 'integrator', 'ci-gooddata-sql', 'gooddata-python', 'dna-tool
 def cli(login: str,
         password: str,
         auth_token: str,
+        config_file: str = None,
         base_url: str = None,
         organization: str = None,
         days: int = None,
         verbose: bool = None,
         repos: List[str] = None):
-    g = get_github_client(base_url, login, password, auth_token)
+    gh_url, gh_org = get_config_params(config_file, base_url, organization)
+    gh_client = get_github_client(gh_url, login, password, auth_token)
 
     repos = list(repos) if repos else REPOS
     time_filter = f'(last {days} days)' if days else ''
     click.echo(f'Calculating for {repos} {time_filter}')
 
-    analyze_repos(g, organization, repos, days, verbose)
+    analyze_repos(gh_client, gh_org, repos, days, verbose)
+
+
+def get_config_params(config_file: str, base_url: str, organization: str):
+    if config_file:
+        with open(config_file, 'r') as cfg_file:
+            cfg = {}
+            if cfg_file.name.endswith('.json'):
+                cfg = json.loads(cfg_file.read())
+            elif cfg_file.name.endswith('.yaml'):
+                cfg = yaml.parse(cfg_file, Loader=yaml.SafeLoader)
+            else:
+                raise ValueError(f'Only JSON or YAML config formats are supported (got \'{cfg_file.name}\')')
+
+            return (base_url if base_url else cfg.get('base_url', BASE_URL),
+                    organization if organization else cfg.get('organization', None))
+    else:
+        return base_url if base_url else BASE_URL, organization
 
 
 def get_github_client(base_url: str, login: str, password: str, token: str):
-    base_url = base_url if base_url else BASE_URL
     return (Github(base_url=base_url, login_or_token=token)
             if token
             else Github(base_url=base_url, login_or_token=login, password=password))

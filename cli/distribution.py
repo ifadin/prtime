@@ -9,8 +9,8 @@ from github.Repository import Repository
 from pandas import DataFrame
 
 
-def analyze_repos(g: Github, org: str, repos: List[str], last_days: int, verbose: bool):
-    org: Organization = g.get_organization(org)
+def analyze_repos(gh: Github, org: str, repos: List[str], last_days: int, verbose: bool):
+    org: Organization = gh.get_organization(org)
     for repo in repos:
         pulls = calculate_pr_time(org.get_repo(repo), last_days)
         if not pulls.empty:
