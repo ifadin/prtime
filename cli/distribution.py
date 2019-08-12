@@ -4,15 +4,13 @@ from typing import List
 
 import click
 from github import Github
-from github.Organization import Organization
 from github.Repository import Repository
 from pandas import DataFrame
 
 
-def analyze_repos(gh: Github, org: str, repos: List[str], last_days: int, verbose: bool):
-    org: Organization = gh.get_organization(org)
+def analyze_repos(gh: Github, repos: List[str], last_days: int, verbose: bool):
     for repo in repos:
-        pulls = calculate_pr_time(org.get_repo(repo), last_days)
+        pulls = calculate_pr_time(gh.get_repo(repo), last_days)
         if not pulls.empty:
             if verbose:
                 click.echo(pulls.sort_values('Time', ascending=False))

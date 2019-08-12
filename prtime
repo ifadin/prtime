@@ -10,7 +10,6 @@ from cli.distribution import analyze_repos
 from cli.options import NotRequiredIfOpt
 
 BASE_URL = 'https://api.github.com'
-REPOS = ['deploy', 'integrator', 'ci-gooddata-sql', 'gooddata-python', 'dna-tools', 'ci-master-workspace', 'airpipe']
 
 
 @click.command()
@@ -35,17 +34,27 @@ def cli(login: str,
         days: int = None,
         verbose: bool = None,
         repos: List[str] = None):
-    gh_url, gh_org = get_config_params(config_file, base_url, organization)
+    gh_url, gh_org, gh_repos = get_config_params(config_file, base_url, organization, repos)
+
+    if not gh_url:
+        gh_url = BASE_URL
+    if not gh_repos:
+        abort('You didn\'t specify any repositories as last argument. Example: ./prtime ifadin/prtime')
+    else:
+        gh_repos = [f'{gh_org}/{r}' for r in gh_repos] if gh_org else gh_repos
+    if not gh_org:
+        for r in gh_repos:
+            if '/' not in r:
+                abort('Please supply repository names in author/repo format or specify organization with -o flag')
+
     gh_client = get_github_client(gh_url, login, password, auth_token)
-
-    repos = list(repos) if repos else REPOS
     time_filter = f'(last {days} days)' if days else ''
-    click.echo(f'Calculating for {repos} {time_filter}')
+    click.echo(f'Calculating for {gh_repos} {time_filter}')
 
-    analyze_repos(gh_client, gh_org, repos, days, verbose)
+    analyze_repos(gh_client, gh_repos, days, verbose)
 
 
-def get_config_params(config_file: str, base_url: str, organization: str):
+def get_config_params(config_file: str, base_url: str, organization: str, repos: List[str]):
     if config_file:
         with open(config_file, 'r') as cfg_file:
             cfg = {}
@@ -56,16 +65,21 @@ def get_config_params(config_file: str, base_url: str, organization: str):
             else:
                 raise ValueError(f'Only JSON or YAML config formats are supported (got \'{cfg_file.name}\')')
 
-            return (base_url if base_url else cfg.get('base_url', BASE_URL),
-                    organization if organization else cfg.get('organization', None))
+            return (base_url if base_url else cfg.get('base_url'),
+                    organization if organization else cfg.get('organization'),
+                    repos if repos else cfg.get('repos'))
     else:
-        return base_url if base_url else BASE_URL, organization
+        return base_url, organization, repos
 
 
 def get_github_client(base_url: str, login: str, password: str, token: str):
     return (Github(base_url=base_url, login_or_token=token)
             if token
             else Github(base_url=base_url, login_or_token=login, password=password))
+
+
+def abort(msg: str):
+    raise click.ClickException(msg)
 
 
 if __name__ == '__main__':
