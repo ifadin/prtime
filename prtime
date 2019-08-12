@@ -8,9 +8,9 @@ from github import Github
 from cli.distribution import analyze_repos
 from cli.notrequiredif import NotRequiredIfOpt
 
-BASE_URL = 'https://github.bus.zalan.do/api/v3'
+BASE_URL = 'https://api.github.com'
+# BASE_URL = 'https://github.bus.zalan.do/api/v3'
 REPOS = ['deploy', 'integrator', 'ci-gooddata-sql', 'gooddata-python', 'dna-tools', 'ci-master-workspace', 'airpipe']
-ORGANIZATION = 'dna'
 
 
 @click.command()
@@ -20,20 +20,30 @@ ORGANIZATION = 'dna'
               cls=NotRequiredIfOpt, not_required_if='auth_token')
 @click.option('-t', '--auth-token', type=click.STRING, help='Github authentication token', required=True,
               cls=NotRequiredIfOpt, not_required_if=['login', 'password'])
+@click.option('-u', '--base-url', type=click.STRING, help='Github API endpoint URL')
+@click.option('-o', '--organization', type=click.STRING, help='Github organization to search repositories in')
 @click.option('-d', '--days', type=click.INT, help='Limit analysis to last n days')
 @click.option('-v', '--verbose', is_flag=True, default=False, help='Print dataset info')
 @click.argument('repos', nargs=-1)
-def cli(login: str, password: str, auth_token: str, days: int, verbose: bool, repos: List[str]):
-    g = get_github_client(BASE_URL, login, password, auth_token)
+def cli(login: str,
+        password: str,
+        auth_token: str,
+        base_url: str = None,
+        organization: str = None,
+        days: int = None,
+        verbose: bool = None,
+        repos: List[str] = None):
+    g = get_github_client(base_url, login, password, auth_token)
 
     repos = list(repos) if repos else REPOS
     time_filter = f'(last {days} days)' if days else ''
     click.echo(f'Calculating for {repos} {time_filter}')
 
-    analyze_repos(g, ORGANIZATION, repos, days, verbose)
+    analyze_repos(g, organization, repos, days, verbose)
 
 
 def get_github_client(base_url: str, login: str, password: str, token: str):
+    base_url = base_url if base_url else BASE_URL
     return (Github(base_url=base_url, login_or_token=token)
             if token
             else Github(base_url=base_url, login_or_token=login, password=password))

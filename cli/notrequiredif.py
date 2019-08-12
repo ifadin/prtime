@@ -22,7 +22,7 @@ class NotRequiredIfOpt(click.Option):
 
         super(NotRequiredIfOpt, self).__init__(*args, **kwargs)
 
-    def handle_parse_result(self, ctx, opts, args):
+    def handle_parse_result(self, ctx, opts: List[click.Option], args: List[click.Argument]):
         current_opt: bool = self.name in opts
         for mutex_opt in self.not_required_if_opts:
             if mutex_opt in opts:
@@ -30,4 +30,6 @@ class NotRequiredIfOpt(click.Option):
                     raise click.UsageError(f'Illegal usage: \'{self.name}\' is mutually exclusive with \'{mutex_opt}\'')
                 else:
                     self.prompt = None
+                    self.required = False
+
         return super(NotRequiredIfOpt, self).handle_parse_result(ctx, opts, args)
