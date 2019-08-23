@@ -8,6 +8,9 @@ from pandas import DataFrame
 
 def get_analysis(gh: Github, repos: List[str], last_days: int) -> Tuple[DataFrame, DataFrame]:
     data = get_pr_data(gh, repos, last_days)
+    if data.empty:
+        return DataFrame([]), data
+
     time = data.groupby('repo')['Time']
     stats = DataFrame({
         'PRs': time.count(),
@@ -25,7 +28,7 @@ def get_pr_data(gh: Github, repos: List[str], last_days: int) -> DataFrame:
     items = []
     for repo in repos:
         pulls = gh.get_repo(repo).get_pulls(state='closed')
-        if not pulls:
+        if not pulls.totalCount:
             click.echo(f'Could not find any matching pull requests in \'{repo}\'')
         for pr in pulls:
             if ((pr.created_at >= datetime.today() - timedelta(days=last_days)) if last_days else True) and pr.merged:

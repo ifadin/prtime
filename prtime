@@ -39,7 +39,9 @@ def cli(login: str,
         export_stats: str = None,
         verbose: bool = None,
         repos: List[str] = None):
-    gh_url, gh_org, gh_repos = merge_config(config_file, base_url, organization, repos)
+    gh_url, gh_org, gh_repos = merge_config(config_file, base_url, organization, list(repos))
+
+    # TODO: handle user|org suffix
 
     if not gh_url:
         gh_url = BASE_URL
@@ -60,9 +62,12 @@ def cli(login: str,
     if export_data or export_stats:
         export(stats, data, stats_export_path=export_stats, data_export_path=export_data)
     else:
-        if verbose:
+        if verbose and not data.empty:
             click.echo(data.sort_values('Time', ascending=False))
-        click.echo(stats)
+        if stats.empty:
+            click.echo('Nothing to show')
+        else:
+            click.echo(stats)
 
 
 def merge_config(config_file: str, base_url: str, organization: str, repos: List[str]):
