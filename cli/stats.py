@@ -1,24 +1,27 @@
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Tuple
 
 import click
 from github import Github
 from pandas import DataFrame
 
 
-def get_time_analysis(gh: Github, repos: List[str], last_days: int, verbose: bool) -> DataFrame:
-    df = get_time_data(gh, repos, last_days)
-    if verbose:
-        click.echo(df.sort_values('Time', ascending=False))
+def get_analysis(gh: Github, repos: List[str], last_days: int) -> Tuple[DataFrame, DataFrame]:
+    data = get_pr_data(gh, repos, last_days)
+    time = data.groupby('repo')['Time']
+    stats = DataFrame({
+        'PRs': time.count(),
+        'mean': time.mean(),
+        'std': time.std(),
+        '50%': time.quantile(q=.5),
+        '95%': time.quantile(q=.95),
+        '99%': time.quantile(q=.99)
+    })
 
-    count = df.groupby('repo')['Time'].count()
-    mean = df.groupby('repo')['Time'].mean()
-    sem = df.groupby('repo')['Time'].sem()
-
-    return DataFrame({'PRs': count, 'mean': mean, 'sem': sem, 'window_left': mean - sem, 'window_right': mean + sem})
+    return stats, data
 
 
-def get_time_data(gh: Github, repos: List[str], last_days: int) -> DataFrame:
+def get_pr_data(gh: Github, repos: List[str], last_days: int) -> DataFrame:
     items = []
     for repo in repos:
         pulls = gh.get_repo(repo).get_pulls(state='closed')

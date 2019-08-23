@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import json
-from typing import List
+from typing import List, Optional
 
 import click
 import yaml
 from github import Github
+from pandas import DataFrame
 
-from cli.distribution import get_time_analysis
 from cli.options import NotRequiredIfOpt
+from cli.stats import get_analysis
 
 BASE_URL = 'https://api.github.com'
 
@@ -22,7 +23,9 @@ BASE_URL = 'https://api.github.com'
 @click.option('-c', '--config-file', type=click.Path(exists=True), help='Path to config file (JSON or YAML)')
 @click.option('-u', '--base-url', type=click.STRING, help='Github API endpoint URL')
 @click.option('-o', '--organization', type=click.STRING, help='Github organization to search repositories in')
-@click.option('-d', '--days', type=click.INT, help='Limit analysis to last n days')
+@click.option('-d', '--days', type=click.INT, help='Limit stats to last n days')
+@click.option('--export-data', type=click.Path(), help='Export path for underlying data')
+@click.option('--export-stats', type=click.Path(), help='Export path for statistics')
 @click.option('-v', '--verbose', is_flag=True, default=False, help='Print dataset info')
 @click.argument('repos', nargs=-1)
 def cli(login: str,
@@ -32,9 +35,11 @@ def cli(login: str,
         base_url: str = None,
         organization: str = None,
         days: int = None,
+        export_data: str = None,
+        export_stats: str = None,
         verbose: bool = None,
         repos: List[str] = None):
-    gh_url, gh_org, gh_repos = get_config_params(config_file, base_url, organization, repos)
+    gh_url, gh_org, gh_repos = merge_config(config_file, base_url, organization, repos)
 
     if not gh_url:
         gh_url = BASE_URL
@@ -51,11 +56,16 @@ def cli(login: str,
     time_filter = f' (last {days} days)' if days else ''
     click.echo(f'Calculating for {highlight(gh_repos)}{time_filter}:')
 
-    df = get_time_analysis(gh_client, gh_repos, days, verbose)
-    click.echo(df)
+    stats, data = get_analysis(gh_client, gh_repos, days)
+    if export_data or export_stats:
+        export(stats, data, stats_export_path=export_stats, data_export_path=export_data)
+    else:
+        if verbose:
+            click.echo(data.sort_values('Time', ascending=False))
+        click.echo(stats)
 
 
-def get_config_params(config_file: str, base_url: str, organization: str, repos: List[str]):
+def merge_config(config_file: str, base_url: str, organization: str, repos: List[str]):
     if config_file:
         with open(config_file, 'r') as cfg_file:
             cfg = {}
@@ -85,6 +95,19 @@ def abort(msg: str):
 
 def highlight(text: str):
     return click.style(f'{text}', fg='green')
+
+
+def export(stats: Optional[DataFrame] = None,
+           data: Optional[DataFrame] = None,
+           stats_export_path: Optional[str] = None,
+           data_export_path: Optional[str] = None):
+    if stats_export_path:
+        stats.to_csv(stats_export_path)
+        click.echo(f'Exported stats > {highlight(stats_export_path)}')
+
+    if data_export_path:
+        data.to_csv(data_export_path)
+        click.echo(f'Exported data > {highlight(data_export_path)}')
 
 
 if __name__ == '__main__':
